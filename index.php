@@ -44,7 +44,7 @@ function wcm1_update_db_version(): void {
  *
  * @return void
  */
-function wcm_delete_db_version(): void {
+function wcm1_delete_db_version(): void {
 	delete_option( 'wcm1_db_version' );
 }
 
@@ -174,7 +174,7 @@ register_activation_hook( __FILE__, 'wcm1_install_tables' );
  */
 function wcm1_uninstall_tables() {
 	wcm1_drop_table();
-	wcm_delete_db_version();
+	wcm1_delete_db_version();
 }
 
 
