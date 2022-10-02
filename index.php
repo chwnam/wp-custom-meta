@@ -18,6 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 const WCM1_DB_VERSION = '1.0.0';
 
+
 /**
  * Get current install DB version.
  *
@@ -36,6 +37,7 @@ function wcm1_get_db_version(): string {
 function wcm1_update_db_version(): void {
 	update_option( 'wcm1_db_version', WCM1_DB_VERSION );
 }
+
 
 /**
  * Delete DB version.
@@ -159,6 +161,7 @@ function wcm1_install_tables() {
 	$wpdb->suppress_errors( $suppress );
 }
 
+
 register_activation_hook( __FILE__, 'wcm1_install_tables' );
 
 
@@ -174,6 +177,7 @@ function wcm1_uninstall_tables() {
 	wcm_delete_db_version();
 }
 
+
 register_deactivation_hook( __FILE__, 'wcm1_uninstall_tables' );
 
 
@@ -188,6 +192,7 @@ function wcm1_update_tables() {
 		wcm1_update_db_version();
 	}
 }
+
 
 add_action( 'plugins_loaded', 'wcm1_update_tables' );
 
@@ -213,7 +218,132 @@ function wcm1_define_extra_objects() {
 	}
 }
 
+
 add_action( 'plugins_loaded', 'wcm1_define_extra_objects' );
+
+
+/**
+ * Initialize meta field.
+ *
+ * @return void
+ *
+ * @uses wcm1_sanitize_recipients()
+ * @uses wcm1_authorize_recipients()
+ */
+function wcm1_init_meta() {
+	register_meta(
+		'news_user',
+		'_recipients',
+		[
+			'type'              => 'string',
+			'description'       => '이메일 수신자 목록. 한 줄에 하나씩 입력하세요. 저장 후 오름차순으로 정렬됩니다.',
+			'default'           => '',
+			'single'            => true,
+			'sanitize_callback' => 'wcm1_sanitize_recipients',
+			'auth_callback'     => 'wcm1_authorize_recipients',
+			'show_in_rest'      => false,
+		]
+	);
+
+	register_meta(
+		'user',
+		'_prot_val',
+		[
+			'type'              => 'string',
+			'description'       => '',
+			'default'           => '',
+			'single'            => true,
+			'sanitize_callback' => 'wcm1_sanitize_recipients',
+			'auth_callback'     => 'wcm1_authorize_recipients',
+			'show_in_rest'      => true,
+		]
+	);
+}
+
+
+/**
+ * @param mixed  $meta_value
+ * @param string $meta_key
+ * @param string $object_type
+ *
+ * @return string
+ */
+function wcm1_sanitize_recipients( $meta_value, string $meta_key, string $object_type ): string {
+	if ( 'news_user' === $object_type && '_recipients' === $meta_key ) {
+		$emails = array_unique( array_filter( array_map( 'sanitize_email', explode( "\r\n", $meta_value ) ) ) );
+		sort( $emails );
+		$meta_value = implode( "\r\n", $emails );
+	}
+
+	return $meta_value;
+}
+
+
+/**
+ * @param bool   $allowed
+ * @param string $meta_key
+ * @param int    $object_id
+ * @param int    $user_id
+ * @param string $cap
+ * @param array  $caps
+ *
+ * @return bool
+ */
+function wcm1_authorize_recipients( bool $allowed, string $meta_key, int $object_id, int $user_id, string $cap, array $caps ): bool {
+	if ( '_recipients' === $meta_key ) {
+		if ( $object_id === $user_id ) {
+			$allowed = true;
+		} else {
+			$allowed = current_user_can( 'administrator' );
+		}
+	}
+
+	return $allowed;
+}
+
+
+add_action( 'init', 'wcm1_init_meta' );
+
+
+/**
+ * Map meta cap for custom meta keys
+ *
+ * @param array  $caps
+ * @param string $cap
+ * @param int    $user_id
+ * @param        $args
+ *
+ * @return array
+ */
+function wcm1_map_meta_cap( array $caps, string $cap, int $user_id, $args ): array {
+	switch ( $cap ) {
+		case 'add_news_user_meta':
+		case 'edit_news_user_meta':
+		case 'delete_news_user_meta':
+		case 'get_news_user_meta':
+			// Actually every user should have $cap capabiliy, but this is just an illustration.
+			// Go easy. Just reset $cap.
+			$caps      = [];
+			$object_id = $args[0] ?? 0;
+			$meta_key  = $args[1] ?? '';
+
+			if ( $meta_key ) {
+				$allowed = ! is_protected_meta( $meta_key, 'news_user' );
+				if ( has_filter( "auth_news_user_meta_{$meta_key}" ) ) {
+					$allowed = apply_filters( "auth_news_user_meta_{$meta_key}", $allowed, $meta_key, $object_id, $user_id, $cap, $caps );
+				}
+				if ( ! $allowed ) {
+					$caps[] = 'do_now_allow';
+				}
+			}
+			break;
+	}
+
+	return $caps;
+}
+
+
+add_filter( 'map_meta_cap', 'wcm1_map_meta_cap', 10, 4 );
 
 
 /**

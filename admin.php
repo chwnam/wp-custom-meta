@@ -32,6 +32,7 @@ function wcm1_admin_menu() {
 function wmc1_output_menu_page() {
 	global $wpdb;
 
+	$meta_keys  = get_registered_meta_keys( 'news_user' );
 	$news_users = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}news_users WHERE id IN (1, 2, 3)" );
 	?>
     <div class="wrap">
@@ -47,7 +48,6 @@ function wmc1_output_menu_page() {
 				 *  user_email: string,
 				 * } $user
 				 */
-
 				$recipents = wcm1_get_news_user_meta( $user->id, '_recipients', true );
 				?>
                 <h2>뉴스 회원 #<?php echo intval( $user->id ); ?> 정보</h2>
@@ -90,8 +90,11 @@ function wmc1_output_menu_page() {
                         <textarea id="recipients-<?php echo intval( $user->id ); ?>"
                                   name="recipients[<?php echo intval( $user->id ); ?>]"
                                   rows="4"
-                                  cols="80"><?php echo esc_textarea( $recipents ); ?></textarea>
-                            <p class="description">한 줄에 하나씩 이메일을 입력해 주세요.</p>
+                                  cols="80"
+                                  <?php
+                                  disabled( false, current_user_can( 'get_news_user_meta', $user->id, '_recipients' ) );
+                                  ?>><?php echo esc_textarea( $recipents ); ?></textarea>
+                            <p class="description"><?php echo esc_html( $meta_keys['_recipients']['description'] ); ?></p>
                         </td>
                     </tr>
                     </tbody>
@@ -154,7 +157,9 @@ function wmc1_submit_update_news_users() {
 			[ 'id' => '%d' ]
 		);
 
-		wcm1_update_news_user_meta( $user_id, '_recipients', $recipients );
+		if ( current_user_can( 'edit_news_user_meta', $user_id, '_recipients' ) ) {
+			wcm1_update_news_user_meta( $user_id, '_recipients', $recipients );
+		}
 	}
 
 	wp_safe_redirect( wp_get_referer() );
