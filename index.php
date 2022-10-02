@@ -244,20 +244,6 @@ function wcm1_init_meta() {
 			'show_in_rest'      => false,
 		]
 	);
-
-	register_meta(
-		'user',
-		'_prot_val',
-		[
-			'type'              => 'string',
-			'description'       => '',
-			'default'           => '',
-			'single'            => true,
-			'sanitize_callback' => 'wcm1_sanitize_recipients',
-			'auth_callback'     => 'wcm1_authorize_recipients',
-			'show_in_rest'      => true,
-		]
-	);
 }
 
 
